@@ -124,6 +124,26 @@ impl<K: Hash, V> FxFingerprintMap<K, V> {
     pub fn iter_fps_mut(&mut self) -> impl Iterator<Item = (&u64, &mut V)> {
         self.inner.iter_mut()
     }
+
+    /// Computes the 64-bit *FxHasher* fingerprint of `key`.
+    #[inline(always)]
+    pub fn fingerprint<Q: ?Sized + Hash>(key: &Q) -> u64 {
+        fingerprint(key)
+    }
+
+    /// Builds a map directly from pre-computed **`(fingerprint, value)`**
+    /// pairs.
+    ///
+    /// Fingerprints can be precomputed with the [`fingerprint`] method.
+    ///
+    /// Use this when you have already hashed the keys (or had to *consume* them
+    /// to build each value) and therefore cannot pass the original keys to
+    /// `collect()`.
+    pub fn from_raw(iter: Vec<(u64, V)>) -> Self {
+        let mut map = Self::new();
+        map.inner.extend(iter);
+        map
+    }
 }
 
 // ────────────────────────────────────────────────────────────
