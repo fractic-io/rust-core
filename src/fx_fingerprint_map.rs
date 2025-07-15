@@ -144,6 +144,18 @@ impl<K: Hash, V> FxFingerprintMap<K, V> {
         map.inner.extend(iter);
         map
     }
+
+    /// Transforms the values in the map using the given function.
+    pub fn map<F, U>(&self, mut f: F) -> FxFingerprintMap<K, U>
+    where
+        F: FnMut(&V) -> U,
+    {
+        let inner = self.inner.iter().map(|(&fp, v)| (fp, f(v))).collect();
+        FxFingerprintMap {
+            inner,
+            _marker: PhantomData,
+        }
+    }
 }
 
 // ────────────────────────────────────────────────────────────
