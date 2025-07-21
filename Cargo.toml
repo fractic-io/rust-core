@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Mart van Buren <mart@fractic.io>"]
 
 [dependencies]
+fractic-server-error = { git = "https://github.com/fractic-io/rust-server-error.git" }
 rustc-hash = "2.1.1"
 
 [dev-dependencies]
