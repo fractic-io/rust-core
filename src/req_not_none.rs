@@ -20,14 +20,14 @@ macro_rules! req_not_none {
 
 #[cfg(test)]
 mod tests {
-    use fractic_cli_scaffolding::{define_cli_error, CliError};
+    use fractic_server_error::{define_internal_error, ServerError};
 
-    define_cli_error!(InvalidConfig, "Invalid configuration: {details}.", { details: &str });
+    define_internal_error!(InvalidConfig, "Invalid configuration: {details}.", { details: &str });
 
     #[test]
     fn test_require_not_none_ok() {
         let important_var = Some("String");
-        let result: Result<&str, CliError> = (|| {
+        let result: Result<&str, ServerError> = (|| {
             req_not_none!(important_var, InvalidConfig);
             Ok(important_var)
         })();
@@ -38,7 +38,7 @@ mod tests {
     #[test]
     fn test_require_not_none_err() {
         let _important_var: Option<String> = None;
-        let result: Result<(), CliError> = (|| {
+        let result: Result<(), ServerError> = (|| {
             req_not_none!(_important_var, InvalidConfig);
             Ok(())
         })();
