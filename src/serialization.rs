@@ -8,43 +8,68 @@
 // - ComplexEnum::VariantB { id: 42, name: "test".to_string() } -> "VariantB_{id_42,name_test}"
 #[macro_export]
 macro_rules! impl_deterministic_display_from_serde {
+	(@logic_result $self_expr:expr, $type:ty) => {
+		::serde_json::to_string($self_expr)
+			// If string, remove surrounding quotes.
+			.map(|s| {
+				if s.starts_with('"') && s.ends_with('"') {
+					s[1..s.len() - 1].to_string()
+				} else {
+					s
+				}
+			})
+			// If map, remove surrounding braces.
+			.map(|s| {
+				if s.starts_with('{') && s.ends_with('}') {
+					s[1..s.len() - 1].to_string()
+				} else {
+					s
+				}
+			})
+			// Replace special characters.
+			.map(|s| {
+				s.replace('\\', "~")
+					.replace('"', "")
+					.replace(':', "_")
+					.replace(' ', "-")
+					.to_string()
+			})
+			.map_err(|e| {
+				eprintln!(
+					"UNHANDLED SERIALIZATION ERROR\n{}.to_string() failed.\n{:?}",
+					stringify!($type),
+					e
+				);
+				::std::fmt::Error
+			})
+	};
     ($type:ty) => {
-        impl std::fmt::Display for $type {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                serde_json::to_string(self)
-                    // If string, remove surrounding quotes.
-                    .map(|s| {
-                        if s.starts_with('"') && s.ends_with('"') {
-                            s[1..s.len() - 1].to_string()
-                        } else {
-                            s
-                        }
-                    })
-                    // If map, remove surrounding braces.
-                    .map(|s| {
-                        if s.starts_with('{') && s.ends_with('}') {
-                            s[1..s.len() - 1].to_string()
-                        } else {
-                            s
-                        }
-                    })
-                    // Replace special characters.
-                    .map(|s| {
-                        s.replace('\\', "~")
-                            .replace('"', "")
-                            .replace(':', "_")
-                            .replace(' ', "-")
-                            .to_string()
-                    })
-                    .map_err(|e| {
-                        eprintln!(
-                            "UNHANDLED SERIALIZATION ERROR\n{}.to_string() failed.\n{:?}",
-                            stringify!($type),
-                            e
-                        );
-                        std::fmt::Error
-                    })?
-                    .fmt(f)
+        impl ::std::fmt::Display for $type {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+				{
+					let s = $crate::impl_deterministic_display_from_serde!(@logic_result self, $type)?;
+					s.fmt(f)
+				}
+            }
+        }
+    };
+    ($type:ty, $fn_name:ident) => {
+        impl $type {
+            pub fn $fn_name(&self) -> ::std::string::String {
+				match $crate::impl_deterministic_display_from_serde!(@logic_result self, $type) {
+					Ok(s) => s,
+					Err(_) => ::std::string::String::new(),
+				}
+            }
+        }
+    };
+    ($type:ty, $trait:path, $fn_name:ident) => {
+        impl $trait for $type {
+            fn $fn_name(&self) -> ::std::string::String {
+				match $crate::impl_deterministic_display_from_serde!(@logic_result self, $type) {
+					Ok(s) => s,
+					Err(_) => ::std::string::String::new(),
+				}
             }
         }
     };
