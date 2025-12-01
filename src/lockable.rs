@@ -7,7 +7,9 @@ use tokio::sync::{Mutex, RwLock};
 /// Syntactic sugar for handling lockable types.
 #[allow(async_fn_in_trait)]
 pub trait Lockable<T: ?Sized> {
+    #[must_use = "Warning: If closure returns a Result<T, ...>, be careful not to discard it."]
     async fn with_lock_mut<O>(&self, f: impl FnOnce(&mut T) -> O) -> O;
+    #[must_use = "Warning: If closure returns a Result<T, ...>, be careful not to discard it."]
     async fn with_lock<O>(&self, f: impl FnOnce(&T) -> O) -> O;
 }
 
@@ -44,7 +46,9 @@ impl<T: ?Sized> Lockable<T> for RwLock<T> {
 /// Syntactic sugar for handling Arc-wrapped lockable types.
 #[allow(async_fn_in_trait)]
 pub trait LockableArc<T: ?Sized> {
+    #[must_use = "Warning: If closure returns a Result<T, ...>, be careful not to discard it."]
     async fn with_lock_mut<O>(&self, f: impl FnOnce(&mut T) -> O) -> O;
+    #[must_use = "Warning: If closure returns a Result<T, ...>, be careful not to discard it."]
     async fn with_lock<O>(&self, f: impl FnOnce(&T) -> O) -> O;
 }
 
