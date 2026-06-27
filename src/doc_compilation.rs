@@ -1,9 +1,16 @@
 use std::{
-    fmt, fs, io,
+    fs,
     path::{Path, PathBuf},
 };
 
+use fractic_server_error::{define_internal_error, ServerError};
 use serde::Deserialize;
+
+define_internal_error!(DocsSpecReadError, "Failed to read docs spec {path}.", { path: &str });
+define_internal_error!(DocsSpecParseError, "Failed to parse docs spec {path}.", { path: &str });
+define_internal_error!(UnknownStandardDocError, "Unknown standard doc: {path}.", { path: &str });
+define_internal_error!(LocalDocReadError, "Failed to read local doc {path}.", { path: &str });
+define_internal_error!(DocsOutputWriteError, "Failed to write compiled docs {path}.", { path: &str });
 
 // Standard docs.
 // ----------------------------------------------------------------------------
@@ -27,7 +34,7 @@ pub struct DocCompiler {
 }
 
 impl DocCompiler {
-    pub fn from_spec(spec_path: impl AsRef<Path>) -> Result<Self, DocsCompilationError> {
+    pub fn from_spec(spec_path: impl AsRef<Path>) -> Result<Self, ServerError> {
         let spec_path = spec_path.as_ref();
         Ok(Self {
             spec: read_spec(spec_path)?,
@@ -38,12 +45,12 @@ impl DocCompiler {
         })
     }
 
-    pub fn run(self, save_to: impl AsRef<Path>) -> Result<(), DocsCompilationError> {
+    pub fn run(self, save_to: impl AsRef<Path>) -> Result<(), ServerError> {
         let save_to = save_to.as_ref();
         let compiled = compile_docs(self.spec, &self.local_base)?;
-        fs::write(save_to, compiled).map_err(|source| DocsCompilationError::OutputWrite {
-            path: save_to.to_path_buf(),
-            source,
+        fs::write(save_to, compiled).map_err(|source| {
+            let path = save_to.display().to_string();
+            DocsOutputWriteError::with_debug(&path, &source)
         })
     }
 }
@@ -58,19 +65,14 @@ struct DocsSpec {
     local: Vec<PathBuf>,
 }
 
-fn read_spec(spec_path: &Path) -> Result<DocsSpec, DocsCompilationError> {
-    let content =
-        fs::read_to_string(spec_path).map_err(|source| DocsCompilationError::SpecRead {
-            path: spec_path.to_path_buf(),
-            source,
-        })?;
-    serde_yaml::from_str(&content).map_err(|source| DocsCompilationError::SpecParse {
-        path: spec_path.to_path_buf(),
-        source,
-    })
+fn read_spec(spec_path: &Path) -> Result<DocsSpec, ServerError> {
+    let path = spec_path.display().to_string();
+    let content = fs::read_to_string(spec_path)
+        .map_err(|source| DocsSpecReadError::with_debug(&path, &source))?;
+    serde_yaml::from_str(&content).map_err(|source| DocsSpecParseError::with_debug(&path, &source))
 }
 
-fn compile_docs(spec: DocsSpec, local_base: &Path) -> Result<String, DocsCompilationError> {
+fn compile_docs(spec: DocsSpec, local_base: &Path) -> Result<String, ServerError> {
     let mut chunks = Vec::new();
 
     for path in spec.standard {
@@ -80,19 +82,16 @@ fn compile_docs(spec: DocsSpec, local_base: &Path) -> Result<String, DocsCompila
             let doc = STANDARD_DOCS
                 .iter()
                 .find(|doc| doc.path == path)
-                .ok_or(DocsCompilationError::UnknownStandardDoc { path })?;
+                .ok_or_else(|| UnknownStandardDocError::new(&path))?;
             chunks.push(normalize_doc(doc.content));
         }
     }
 
     for path in spec.local {
         let full_path = local_base.join(&path);
-        let content = fs::read_to_string(&full_path).map_err(|source| {
-            DocsCompilationError::LocalDocRead {
-                path: full_path,
-                source,
-            }
-        })?;
+        let full_path_string = full_path.display().to_string();
+        let content = fs::read_to_string(&full_path)
+            .map_err(|source| LocalDocReadError::with_debug(&full_path_string, &source))?;
         chunks.push(normalize_doc(&content));
     }
 
@@ -102,57 +101,3 @@ fn compile_docs(spec: DocsSpec, local_base: &Path) -> Result<String, DocsCompila
 fn normalize_doc(content: &str) -> String {
     content.trim().to_string()
 }
-
-// Error handling.
-// ----------------------------------------------------------------------------
-
-#[derive(Debug)]
-pub enum DocsCompilationError {
-    SpecRead {
-        path: PathBuf,
-        source: io::Error,
-    },
-    SpecParse {
-        path: PathBuf,
-        source: serde_yaml::Error,
-    },
-    UnknownStandardDoc {
-        path: String,
-    },
-    LocalDocRead {
-        path: PathBuf,
-        source: io::Error,
-    },
-    OutputWrite {
-        path: PathBuf,
-        source: io::Error,
-    },
-}
-
-impl fmt::Display for DocsCompilationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DocsCompilationError::SpecRead { path, source } => {
-                write!(f, "failed to read docs spec {}: {source}", path.display())
-            }
-            DocsCompilationError::SpecParse { path, source } => {
-                write!(f, "failed to parse docs spec {}: {source}", path.display())
-            }
-            DocsCompilationError::UnknownStandardDoc { path } => {
-                write!(f, "unknown standard doc: {path}")
-            }
-            DocsCompilationError::LocalDocRead { path, source } => {
-                write!(f, "failed to read local doc {}: {source}", path.display())
-            }
-            DocsCompilationError::OutputWrite { path, source } => {
-                write!(
-                    f,
-                    "failed to write compiled docs {}: {source}",
-                    path.display()
-                )
-            }
-        }
-    }
-}
-
-impl std::error::Error for DocsCompilationError {}
