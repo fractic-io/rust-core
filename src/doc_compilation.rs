@@ -15,15 +15,15 @@ define_internal_error!(DocsOutputWriteError, "Failed to write compiled docs {pat
 // Standard docs.
 // ----------------------------------------------------------------------------
 
-const STANDARD_DOCS: &[StandardDoc] = &[StandardDoc {
-    path: "style.md",
-    content: include_str!("../res/style.md"),
-}];
-
 struct StandardDoc {
     path: &'static str,
     content: &'static str,
 }
+
+const STANDARD_DOCS: &[StandardDoc] = &[StandardDoc {
+    path: "style.md",
+    content: include_str!("../res/style.md"),
+}];
 
 // Public interface.
 // ----------------------------------------------------------------------------
