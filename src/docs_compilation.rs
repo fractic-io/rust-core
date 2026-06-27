@@ -5,16 +5,21 @@ use std::{
 
 use serde::Deserialize;
 
-const CORE_DOCS: &[CoreDoc] = &[CoreDoc {
-    path: "rust-style.md",
-    content: include_str!("../res/rust-style.md"),
+const STANDARD_DOCS: &[StandardDoc] = &[StandardDoc {
+    path: "style.md",
+    content: include_str!("../res/style.md"),
 }];
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct DocsSpec {
-    pub fractic_core: Vec<String>,
-    pub local: Vec<PathBuf>,
+struct DocsSpec {
+    standard: Vec<String>,
+    local: Vec<PathBuf>,
+}
+
+pub struct DocCompiler {
+    spec: DocsSpec,
+    local_base: PathBuf,
 }
 
 #[derive(Debug)]
@@ -27,7 +32,7 @@ pub enum DocsCompilationError {
         path: PathBuf,
         source: serde_yaml::Error,
     },
-    UnknownCoreDoc {
+    UnknownStandardDoc {
         path: String,
     },
     LocalDocRead {
@@ -40,34 +45,46 @@ pub enum DocsCompilationError {
     },
 }
 
-struct CoreDoc {
+struct StandardDoc {
     path: &'static str,
     content: &'static str,
 }
 
-pub fn compile_docs_from_spec_file(
-    spec_path: impl AsRef<Path>,
-    output_path: impl AsRef<Path>,
-) -> Result<(), DocsCompilationError> {
-    let spec_path = spec_path.as_ref();
-    let output_path = output_path.as_ref();
-    let spec = read_spec(spec_path)?;
-    let compiled = compile_docs(spec, spec_path.parent().unwrap_or_else(|| Path::new(".")))?;
-    fs::write(output_path, compiled).map_err(|source| DocsCompilationError::OutputWrite {
-        path: output_path.to_path_buf(),
-        source,
-    })
+impl DocCompiler {
+    pub fn from_spec(spec_path: impl AsRef<Path>) -> Result<Self, DocsCompilationError> {
+        let spec_path = spec_path.as_ref();
+        Ok(Self {
+            spec: read_spec(spec_path)?,
+            local_base: spec_path
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .to_path_buf(),
+        })
+    }
+
+    pub fn run(self, save_to: impl AsRef<Path>) -> Result<(), DocsCompilationError> {
+        let save_to = save_to.as_ref();
+        let compiled = compile_docs(self.spec, &self.local_base)?;
+        fs::write(save_to, compiled).map_err(|source| DocsCompilationError::OutputWrite {
+            path: save_to.to_path_buf(),
+            source,
+        })
+    }
 }
 
-pub fn compile_docs(spec: DocsSpec, local_base: &Path) -> Result<String, DocsCompilationError> {
+fn compile_docs(spec: DocsSpec, local_base: &Path) -> Result<String, DocsCompilationError> {
     let mut chunks = Vec::new();
 
-    for path in spec.fractic_core {
-        let doc = CORE_DOCS
-            .iter()
-            .find(|doc| doc.path == path)
-            .ok_or(DocsCompilationError::UnknownCoreDoc { path })?;
-        chunks.push(normalize_doc(doc.content));
+    for path in spec.standard {
+        if path == "*" {
+            chunks.extend(STANDARD_DOCS.iter().map(|doc| normalize_doc(doc.content)));
+        } else {
+            let doc = STANDARD_DOCS
+                .iter()
+                .find(|doc| doc.path == path)
+                .ok_or(DocsCompilationError::UnknownStandardDoc { path })?;
+            chunks.push(normalize_doc(doc.content));
+        }
     }
 
     for path in spec.local {
@@ -109,8 +126,8 @@ impl fmt::Display for DocsCompilationError {
             DocsCompilationError::SpecParse { path, source } => {
                 write!(f, "failed to parse docs spec {}: {source}", path.display())
             }
-            DocsCompilationError::UnknownCoreDoc { path } => {
-                write!(f, "unknown fractic-core doc: {path}")
+            DocsCompilationError::UnknownStandardDoc { path } => {
+                write!(f, "unknown standard doc: {path}")
             }
             DocsCompilationError::LocalDocRead { path, source } => {
                 write!(f, "failed to read local doc {}: {source}", path.display())
