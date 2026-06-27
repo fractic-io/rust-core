@@ -5,49 +5,25 @@ use std::{
 
 use serde::Deserialize;
 
+// Standard docs.
+// ----------------------------------------------------------------------------
+
 const STANDARD_DOCS: &[StandardDoc] = &[StandardDoc {
     path: "style.md",
     content: include_str!("../res/style.md"),
 }];
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct DocsSpec {
-    standard: Vec<String>,
-    local: Vec<PathBuf>,
+struct StandardDoc {
+    path: &'static str,
+    content: &'static str,
 }
+
+// Public interface.
+// ----------------------------------------------------------------------------
 
 pub struct DocCompiler {
     spec: DocsSpec,
     local_base: PathBuf,
-}
-
-#[derive(Debug)]
-pub enum DocsCompilationError {
-    SpecRead {
-        path: PathBuf,
-        source: io::Error,
-    },
-    SpecParse {
-        path: PathBuf,
-        source: serde_yaml::Error,
-    },
-    UnknownStandardDoc {
-        path: String,
-    },
-    LocalDocRead {
-        path: PathBuf,
-        source: io::Error,
-    },
-    OutputWrite {
-        path: PathBuf,
-        source: io::Error,
-    },
-}
-
-struct StandardDoc {
-    path: &'static str,
-    content: &'static str,
 }
 
 impl DocCompiler {
@@ -70,6 +46,28 @@ impl DocCompiler {
             source,
         })
     }
+}
+
+// Compilation.
+// ----------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct DocsSpec {
+    standard: Vec<String>,
+    local: Vec<PathBuf>,
+}
+
+fn read_spec(spec_path: &Path) -> Result<DocsSpec, DocsCompilationError> {
+    let content =
+        fs::read_to_string(spec_path).map_err(|source| DocsCompilationError::SpecRead {
+            path: spec_path.to_path_buf(),
+            source,
+        })?;
+    serde_yaml::from_str(&content).map_err(|source| DocsCompilationError::SpecParse {
+        path: spec_path.to_path_buf(),
+        source,
+    })
 }
 
 fn compile_docs(spec: DocsSpec, local_base: &Path) -> Result<String, DocsCompilationError> {
@@ -101,20 +99,34 @@ fn compile_docs(spec: DocsSpec, local_base: &Path) -> Result<String, DocsCompila
     Ok(format!("{}\n", chunks.join("\n\n")))
 }
 
-fn read_spec(spec_path: &Path) -> Result<DocsSpec, DocsCompilationError> {
-    let content =
-        fs::read_to_string(spec_path).map_err(|source| DocsCompilationError::SpecRead {
-            path: spec_path.to_path_buf(),
-            source,
-        })?;
-    serde_yaml::from_str(&content).map_err(|source| DocsCompilationError::SpecParse {
-        path: spec_path.to_path_buf(),
-        source,
-    })
-}
-
 fn normalize_doc(content: &str) -> String {
     content.trim().to_string()
+}
+
+// Error handling.
+// ----------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub enum DocsCompilationError {
+    SpecRead {
+        path: PathBuf,
+        source: io::Error,
+    },
+    SpecParse {
+        path: PathBuf,
+        source: serde_yaml::Error,
+    },
+    UnknownStandardDoc {
+        path: String,
+    },
+    LocalDocRead {
+        path: PathBuf,
+        source: io::Error,
+    },
+    OutputWrite {
+        path: PathBuf,
+        source: io::Error,
+    },
 }
 
 impl fmt::Display for DocsCompilationError {
