@@ -1,4 +1,4 @@
-# General Rust Style
+# General Principles
 
 - Prefer small, cohesive modules over long mixed-purpose files. A file should usually have one dominant reason to change.
 - Keep public type definitions easy to scan. If a module defines several related structs/enums, group the definitions together before longer impl blocks.
