@@ -23,6 +23,18 @@
 
 - Put the main public type or trait and its caller-facing impls under `Public interface`; keep private state types, parsing structs, and implementation-only impls under `Internal`; keep free utility functions under `Helpers`. Do not move a private helper type into the public definitions area just because it is a type definition.
 - Use subsection headers such as `Internal: Parsing.` or `Helpers: Search.` when a long file has clearly distinct implementation or helper groups. Prefer a short domain label that explains the concern, not the Rust construct.
+- Put file-local `#[cfg(test)]` test modules at the end of the file under a `Tests` section header:
+
+```rust
+// Tests.
+// ----------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    ...
+}
+```
+
 - Small, tightly scoped helper types or functions may live inside the function that uses them when they are not reused elsewhere.
 - Use concise, factual doc comments for public input/configuration structs and enums. Explain what the caller provides, not how the internals work.
 - Put imports at the top of the file. Avoid `use` statements midway through code.
