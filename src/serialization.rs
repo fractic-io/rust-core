@@ -87,10 +87,10 @@ mod tests {
     #[derive(Serialize, Deserialize, Debug)]
     #[serde(rename_all = "lowercase")]
     enum SimpleEnum {
-        ValueOne,
+        First,
         #[serde(rename = "renamed_value")]
-        ValueTwo,
-        ValueThree,
+        Second,
+        Third,
     }
 
     impl_deterministic_display_from_serde!(SimpleEnum);
@@ -124,9 +124,9 @@ mod tests {
 
     #[test]
     fn test_display_simple_enum() {
-        assert_eq!(SimpleEnum::ValueOne.to_string(), "valueone");
-        assert_eq!(SimpleEnum::ValueTwo.to_string(), "renamed_value");
-        assert_eq!(SimpleEnum::ValueThree.to_string(), "valuethree");
+        assert_eq!(SimpleEnum::First.to_string(), "first");
+        assert_eq!(SimpleEnum::Second.to_string(), "renamed_value");
+        assert_eq!(SimpleEnum::Third.to_string(), "third");
     }
 
     #[test]
